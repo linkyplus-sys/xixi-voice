@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.linky.voiceclone"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.linky.voiceclone"
@@ -71,5 +71,5 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
-    // 液态玻璃 Backdrop
+    testImplementation("junit:junit:4.13.2")
 }

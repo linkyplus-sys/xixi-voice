@@ -13,7 +13,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        window.isStatusBarContrastEnforced = false
         setContent {
             VoiceCloneTheme {
                 Navigation()

@@ -5,350 +5,493 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import com.linky.voiceclone.ui.AppTopBar
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.MicNone
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.linky.voiceclone.data.Voice
+import com.linky.voiceclone.ui.AppTopBar
+import com.linky.voiceclone.ui.components.GlassSurface
+import com.linky.voiceclone.ui.components.VoiceAvatar
 import com.linky.voiceclone.util.PlayerManager
 import com.linky.voiceclone.util.WavRecorder
+import com.linky.voiceclone.viewmodel.VoiceImportState
 import com.linky.voiceclone.viewmodel.VoiceViewModel
-import android.media.MediaPlayer
 import java.io.File
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VoicesScreen() {
-    val vm: VoiceViewModel = hiltViewModel()
-    val voices by vm.voices.collectAsStateWithLifecycle()
+    val viewModel: VoiceViewModel = hiltViewModel()
+    val voices by viewModel.voices.collectAsStateWithLifecycle()
+    val importState by viewModel.importState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var recordedFile by remember { mutableStateOf<File?>(null) }
     var voiceName by remember { mutableStateOf("") }
-    var voiceDesc by remember { mutableStateOf("") }
+    var voiceDescription by remember { mutableStateOf("") }
+    var isRecording by remember { mutableStateOf(false) }
+    var isFinalizing by remember { mutableStateOf(false) }
+    var elapsedSeconds by remember { mutableIntStateOf(0) }
+    var amplitude by remember { mutableFloatStateOf(0f) }
+    var screenError by remember { mutableStateOf("") }
+    val recorder = remember { WavRecorder() }
 
-    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { selectedUri = it; showAddDialog = true }
+    fun resetForm() {
+        selectedUri = null
+        recordedFile?.delete()
+        recordedFile = null
+        voiceName = ""
+        voiceDescription = ""
+        viewModel.clearImportState()
     }
 
-    var isRecording by remember { mutableStateOf(false) }
-    val wavRecorder = remember { WavRecorder() }
-    var recordedFile by remember { mutableStateOf<File?>(null) }
+    fun startRecording() {
+        val file = File(context.cacheDir, "record_${System.currentTimeMillis()}.wav")
+        runCatching { recorder.start(file) }
+            .onSuccess {
+                recordedFile?.delete()
+                recordedFile = file
+                screenError = ""
+                isRecording = true
+            }
+            .onFailure {
+                file.delete()
+                screenError = it.message ?: "无法开始录音"
+            }
+    }
 
-    // 计时器
-    var elapsedSeconds by remember { mutableIntStateOf(0) }
+    fun finishRecording() {
+        if (!isRecording || isFinalizing) return
+        isRecording = false
+        isFinalizing = true
+        recorder.stop { error ->
+            isFinalizing = false
+            if (error != null) {
+                recordedFile?.delete()
+                recordedFile = null
+                screenError = error
+            } else if (recordedFile?.isFile == true) {
+                showAddDialog = true
+            } else {
+                screenError = "录音文件生成失败"
+            }
+        }
+    }
+
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            selectedUri = uri
+            recordedFile?.delete()
+            recordedFile = null
+            screenError = ""
+            showAddDialog = true
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startRecording()
+        else screenError = "需要麦克风权限才能录制音色"
+    }
+
+    LaunchedEffect(isRecording) {
+        if (isRecording) {
+            while (isRecording) {
+                kotlinx.coroutines.delay(50)
+                amplitude = recorder.amplitude()
+            }
+        }
+        amplitude = 0f
+    }
     LaunchedEffect(isRecording) {
         if (isRecording) {
             elapsedSeconds = 0
             while (isRecording) {
-                kotlinx.coroutines.delay(1000)
-                elapsedSeconds++
+                kotlinx.coroutines.delay(1_000)
+                if (isRecording) elapsedSeconds++
             }
         }
     }
-
-    // 振幅（每帧刷新）
-    var amplitude by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(isRecording) {
-        if (isRecording) {
-            while (isRecording) {
-                amplitude = wavRecorder.amplitude()
-                kotlinx.coroutines.delay(50) // ~20fps
-            }
-            amplitude = 0f
+    LaunchedEffect(importState) {
+        if (importState is VoiceImportState.Success) {
+            showAddDialog = false
+            resetForm()
         }
     }
-
-    DisposableEffect(Unit) { onDispose { if (wavRecorder.isRecording()) wavRecorder.stop() } }
-
-    val recordPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            val f = File(context.cacheDir, "record_${System.currentTimeMillis()}.wav")
-            wavRecorder.start(f)
-            recordedFile = f; isRecording = true
+    DisposableEffect(recorder) {
+        onDispose {
+            recorder.stop { recordedFile?.delete() }
         }
     }
 
     Column(Modifier.fillMaxSize()) {
-        AppTopBar(title = "音色管理")
-
+        AppTopBar(title = "我的音色")
         LazyColumn(
-            Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(bottom = 24.dp)
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("➕ 添加新音色", fontWeight = FontWeight.Medium, color = Color.White)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = {
-                                if (isRecording) {
-                                    wavRecorder.stop(); isRecording = false
-                                    recordedFile?.let { showAddDialog = true }
-                                } else {
-                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                                        val f = File(context.cacheDir, "record_${System.currentTimeMillis()}.wav")
-                                        wavRecorder.start(f)
-                                        recordedFile = f; isRecording = true
-                                    } else {
-                                        recordPermission.launch(Manifest.permission.RECORD_AUDIO)
-                                    }
-                                }
-                            }, modifier = Modifier.weight(1f)) {
-                                Icon(if (isRecording) Icons.Default.Stop else Icons.Default.FiberManualRecord, null)
-                                Spacer(Modifier.width(4.dp))
-                                Text(if (isRecording) "停止录音" else "录音")
-                            }
-                            OutlinedButton(onClick = { filePicker.launch("audio/*") }, modifier = Modifier.weight(1f)) {
-                                Icon(Icons.Default.FolderOpen, null)
-                                Spacer(Modifier.width(4.dp))
-                                Text("选择文件")
-                            }
-                        }
-
-                        // 录音状态：计时 + 振幅动画
-                        if (isRecording) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Text("创建音色", style = MaterialTheme.typography.titleMedium)
+            }
+            item {
+                GlassSurface(Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = {
+                                    if (isRecording) finishRecording()
+                                    else if (ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.RECORD_AUDIO,
+                                        ) == PackageManager.PERMISSION_GRANTED
+                                    ) startRecording()
+                                    else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                },
+                                enabled = !isFinalizing,
+                                modifier = Modifier.weight(1f).height(48.dp),
                             ) {
-                                // 振幅呼吸灯
-                                RecordingIndicator(amplitude)
-                                // 计时
-                                val mm = elapsedSeconds / 60
-                                val ss = elapsedSeconds % 60
-                                Text(
-                                    String.format(Locale.getDefault(), "%02d:%02d", mm, ss),
-                                    fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                                Text(
-                                    if (elapsedSeconds < 10) "建议录 10-30 秒"
-                                    else if (elapsedSeconds <= 30) "✓ 时长合适"
-                                    else "已超 30 秒，可以停止",
-                                    fontSize = 12.sp,
-                                    color = if (elapsedSeconds in 10..30) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Icon(if (isRecording) Icons.Default.Stop else Icons.Default.FiberManualRecord, null)
+                                Spacer(Modifier.width(7.dp))
+                                Text(if (isFinalizing) "保存中" else if (isRecording) "停止" else "录制声音")
+                            }
+                            OutlinedButton(
+                                onClick = { filePicker.launch("audio/*") },
+                                enabled = !isRecording && !isFinalizing,
+                                modifier = Modifier.weight(1f).height(48.dp),
+                            ) {
+                                Icon(Icons.Default.FolderOpen, null)
+                                Spacer(Modifier.width(7.dp))
+                                Text("导入音频")
                             }
                         }
 
-                        Text("样本质量影响克隆效果：干净人声、10-30秒、WAV 优先",
-                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (isRecording || isFinalizing) {
+                            RecordingPanel(amplitude, elapsedSeconds, isFinalizing)
+                        } else {
+                            Text(
+                                "推荐 10–30 秒干净人声；MiMo 克隆仅支持 WAV / MP3",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (screenError.isNotBlank()) {
+                            Text(screenError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
 
             item {
-                Text("已保存的音色", style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("已保存音色", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${voices.size} 个",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             if (voices.isEmpty()) {
                 item {
-                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("暂无音色", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.MicNone,
+                                null,
+                                modifier = Modifier.size(42.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text("还没有音色", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
-            }
-            items(voices, key = { it.id }) { voice ->
-                VoiceManageCard(voice, sampleDir = vm.getSampleDir(),
-                    onDelete = { vm.deleteVoice(voice) },
-                    onEdit = { name, desc -> vm.updateVoice(voice.copy(name = name, description = desc)) }
-                )
+            } else {
+                items(voices, key = { it.id }) { voice ->
+                    VoiceCard(
+                        voice = voice,
+                        sampleDir = viewModel.getSampleDir(),
+                        onEdit = { name, description ->
+                            viewModel.updateVoice(voice.copy(name = name, description = description))
+                        },
+                        onDelete = { viewModel.deleteVoice(voice) },
+                    )
+                }
             }
         }
     }
 
     if (showAddDialog) {
+        val importing = importState is VoiceImportState.Importing
+        val importError = (importState as? VoiceImportState.Error)?.message
         AlertDialog(
-            onDismissRequest = { showAddDialog = false; selectedUri = null; recordedFile = null; voiceName = ""; voiceDesc = "" },
+            onDismissRequest = {
+                if (!importing) {
+                    showAddDialog = false
+                    resetForm()
+                }
+            },
             title = { Text("保存音色") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(voiceName, { voiceName = it }, label = { Text("名称") },
-                        placeholder = { Text("例如：我的声音") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(voiceDesc, { voiceDesc = it }, label = { Text("描述（可选）") },
-                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = voiceName,
+                        onValueChange = { voiceName = it },
+                        label = { Text("音色名称") },
+                        placeholder = { Text("例如：我的声音") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = voiceDescription,
+                        onValueChange = { voiceDescription = it },
+                        label = { Text("描述（可选）") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "保存时会校验真实格式和 MiMo 10MB Base64 限制",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (!importError.isNullOrBlank()) {
+                        Text(importError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val name = voiceName.trim().ifBlank { "未命名" }
-                    val src = when {
-                        recordedFile != null -> recordedFile!!
-                        selectedUri != null -> {
-                            val tmp = File(context.cacheDir, "upload_${System.currentTimeMillis()}")
-                            context.contentResolver.openInputStream(selectedUri!!)?.use { tmp.writeBytes(it.readBytes()) }
-                            tmp
+                TextButton(
+                    onClick = {
+                        val name = voiceName.trim().ifBlank { "未命名" }
+                        when {
+                            recordedFile != null -> viewModel.importRecordedVoice(name, voiceDescription, recordedFile!!)
+                            selectedUri != null -> viewModel.importVoice(name, voiceDescription, selectedUri!!)
                         }
-                        else -> return@TextButton
+                    },
+                    enabled = !importing && (recordedFile != null || selectedUri != null),
+                ) {
+                    if (importing) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(6.dp))
                     }
-                    vm.addVoice(name, voiceDesc.trim(), src)
-                    showAddDialog = false; selectedUri = null; recordedFile = null; voiceName = ""; voiceDesc = ""
-                }) { Text("保存") }
+                    Text(if (importing) "校验中" else "保存")
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false; selectedUri = null; recordedFile = null; voiceName = ""; voiceDesc = "" }) {
-                    Text("取消")
-                }
-            }
+                TextButton(
+                    onClick = { showAddDialog = false; resetForm() },
+                    enabled = !importing,
+                ) { Text("取消") }
+            },
         )
     }
 }
 
-/** 录音指示器：红点 + 振幅缩放动画 */
+@Composable
+private fun RecordingPanel(amplitude: Float, elapsedSeconds: Int, finalizing: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        RecordingIndicator(amplitude)
+        Spacer(Modifier.width(14.dp))
+        Column {
+            Text(
+                if (finalizing) "正在生成 WAV 文件" else String.format(
+                    Locale.getDefault(),
+                    "%02d:%02d",
+                    elapsedSeconds / 60,
+                    elapsedSeconds % 60,
+                ),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                when {
+                    finalizing -> "马上就好"
+                    elapsedSeconds < 10 -> "建议至少录制 10 秒"
+                    elapsedSeconds <= 30 -> "当前时长适合克隆"
+                    else -> "样本已经足够，可以停止"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @Composable
 private fun RecordingIndicator(amplitude: Float) {
-    // 基础呼吸动画
-    val infiniteTransition = rememberInfiniteTransition(label = "breath")
-    val breathScale by infiniteTransition.animateFloat(
-        initialValue = 0.8f, targetValue = 1.2f,
+    val infiniteTransition = rememberInfiniteTransition(label = "recordingPulse")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.15f,
         animationSpec = infiniteRepeatable(tween(800, easing = EaseInOut), RepeatMode.Reverse),
-        label = "breathScale"
+        label = "pulse",
     )
-
-    // 振幅叠加：基础缩放 + 振幅增量
-    val targetScale = breathScale * (1f + amplitude * 0.5f)
-    val smoothScale by animateFloatAsState(targetScale, tween(50), label = "smooth")
-
+    val scale by animateFloatAsState(pulse * (1f + amplitude * 0.45f), tween(50), label = "amplitude")
     Box(contentAlignment = Alignment.Center) {
-        // 外圈光晕
-        Box(Modifier
-            .size(32.dp)
-            .scale(smoothScale)
-            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.2f), CircleShape)
+        Box(
+            Modifier
+                .size(38.dp)
+                .scale(scale)
+                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.18f), CircleShape),
         )
-        // 红点
-        Box(Modifier
-            .size(16.dp)
-            .background(MaterialTheme.colorScheme.error, CircleShape)
-        )
+        Box(Modifier.size(16.dp).background(MaterialTheme.colorScheme.error, CircleShape))
     }
 }
 
 @Composable
-private fun VoiceManageCard(voice: Voice, sampleDir: File, onDelete: () -> Unit, onEdit: (String, String) -> Unit) {
-    var confirmDelete by remember { mutableStateOf(false) }
-    var showEditDialog by remember { mutableStateOf(false) }
-    var editName by remember { mutableStateOf(voice.name) }
-    var editDesc by remember { mutableStateOf(voice.description) }
-    val format = voice.sampleFileName.substringAfterLast('.').uppercase()
-    var previewPlaying by remember { mutableStateOf(false) }
-    var previewPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
-    DisposableEffect(Unit) { onDispose { previewPlayer?.release(); previewPlayer = null } }
+private fun VoiceCard(
+    voice: Voice,
+    sampleDir: File,
+    onEdit: (String, String) -> Unit,
+    onDelete: () -> Unit,
+) {
+    val sample = remember(voice.sampleFileName, sampleDir) { File(sampleDir, voice.sampleFileName) }
+    val source = sample.absolutePath
+    var playing by remember { mutableStateOf(false) }
+    var playbackError by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    var editName by remember(voice.name) { mutableStateOf(voice.name) }
+    var editDescription by remember(voice.description) { mutableStateOf(voice.description) }
+    DisposableEffect(source) { onDispose { PlayerManager.release(source) } }
 
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            // 试听按钮
-            IconButton(onClick = {
-                val sampleFile = File(sampleDir, voice.sampleFileName)
-                if (!sampleFile.exists()) return@IconButton
-                if (previewPlaying) {
-                    previewPlayer?.let { PlayerManager.pause(it) }
-                    previewPlaying = false
-                } else {
-                    val p = MediaPlayer().apply {
-                        setDataSource(sampleFile.absolutePath)
-                        prepare()
-                    }
-                    previewPlayer = p
-                    PlayerManager.play(p) { previewPlaying = false; previewPlayer = null }
-                    previewPlaying = true
-                }
-            }) {
-                Icon(
-                    if (previewPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    "试听"
-                )
-            }
+    GlassSurface(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            VoiceAvatar(voice.id, voice.name, Modifier.size(48.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(voice.name, fontWeight = FontWeight.Medium)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .height(16.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                RoundedCornerShape(3.dp)
-                            )
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(3.dp))
-                            .padding(horizontal = 5.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(format,
-                            fontSize = 9.sp, fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 9.sp
-                        )
-                    }
-                    val meta = buildString {
-                        if (voice.description.isNotBlank()) append(voice.description)
-                        if (isNotEmpty()) append(" · ")
-                        append("${(voice.sampleSize / 1024)}KB")
-                    }
-                    Text(meta, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Text(voice.name, fontWeight = FontWeight.SemiBold)
+                Text(
+                    buildString {
+                        if (voice.description.isNotBlank()) append(voice.description).append(" · ")
+                        append(voice.sampleFileName.substringAfterLast('.').uppercase())
+                        append(" · ${voice.sampleSize / 1024}KB")
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (playbackError.isNotBlank()) {
+                    Text(playbackError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
-            IconButton(onClick = { editName = voice.name; editDesc = voice.description; showEditDialog = true }) {
-                Icon(Icons.Default.Edit, "编辑")
+            IconButton(onClick = {
+                if (!sample.isFile) {
+                    playbackError = "样本文件不存在"
+                } else if (PlayerManager.isPlaying(source)) {
+                    PlayerManager.stop(source)
+                    playing = false
+                } else {
+                    playbackError = ""
+                    PlayerManager.play(
+                        source,
+                        onStarted = { playing = true },
+                        onStopped = { playing = false },
+                        onError = { playbackError = it; playing = false },
+                    )
+                }
+            }) {
+                Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = "试听")
             }
-            IconButton(onClick = { confirmDelete = true }) {
-                Icon(Icons.Default.Delete, "删除", tint = MaterialTheme.colorScheme.error)
+            IconButton(onClick = { editing = true }) {
+                Icon(Icons.Default.Edit, contentDescription = "编辑")
+            }
+            IconButton(onClick = { deleting = true }) {
+                Icon(Icons.Default.DeleteOutline, contentDescription = "删除", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
 
-    if (confirmDelete) {
+    if (editing) {
         AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("删除音色") },
-            text = { Text("确定删除「${voice.name}」？") },
-            confirmButton = { TextButton(onClick = { onDelete(); confirmDelete = false }) { Text("删除") } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } }
-        )
-    }
-
-    if (showEditDialog) {
-        AlertDialog(
-            onDismissRequest = { showEditDialog = false },
+            onDismissRequest = { editing = false },
             title = { Text("编辑音色") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(editName, { editName = it }, label = { Text("名称") },
-                        singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(editDesc, { editDesc = it }, label = { Text("描述") },
-                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(editName, { editName = it }, label = { Text("名称") }, singleLine = true)
+                    OutlinedTextField(editDescription, { editDescription = it }, label = { Text("描述") }, singleLine = true)
                 }
             },
-            confirmButton = { TextButton(onClick = { onEdit(editName.trim(), editDesc.trim()); showEditDialog = false }) { Text("保存") } },
-            dismissButton = { TextButton(onClick = { showEditDialog = false }) { Text("取消") } }
+            confirmButton = {
+                TextButton(onClick = {
+                    onEdit(editName.trim().ifBlank { voice.name }, editDescription.trim())
+                    editing = false
+                }) { Text("保存") }
+            },
+            dismissButton = { TextButton(onClick = { editing = false }) { Text("取消") } },
+        )
+    }
+    if (deleting) {
+        AlertDialog(
+            onDismissRequest = { deleting = false },
+            title = { Text("删除音色") },
+            text = { Text("确定删除「${voice.name}」及其音频样本吗？") },
+            confirmButton = {
+                TextButton(onClick = { onDelete(); deleting = false }) { Text("删除") }
+            },
+            dismissButton = { TextButton(onClick = { deleting = false }) { Text("取消") } },
         )
     }
 }
