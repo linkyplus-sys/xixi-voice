@@ -43,6 +43,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.linky.voiceclone.data.GenerationHistory
 import com.linky.voiceclone.ui.AppTopBar
+import com.linky.voiceclone.ui.components.AudioSaveButton
+import com.linky.voiceclone.ui.components.audioMimeType
 import com.linky.voiceclone.ui.components.GlassSurface
 import com.linky.voiceclone.ui.components.StaticWaveform
 import com.linky.voiceclone.ui.components.VoiceAvatar
@@ -194,6 +196,11 @@ private fun HistoryCard(
                     Text(if (playing) "停止" else "播放")
                 }
                 Row {
+                    AudioSaveButton(
+                        file = file,
+                        format = entry.format,
+                        timestamp = entry.createdAt,
+                    )
                     IconButton(onClick = {
                         if (!file.isFile) {
                             playbackError = "音频文件已丢失"
@@ -207,7 +214,7 @@ private fun HistoryCard(
                         context.startActivity(
                             Intent.createChooser(
                                 Intent(Intent.ACTION_SEND).apply {
-                                    type = if (entry.format == "mp3") "audio/mpeg" else "audio/wav"
+                                    type = audioMimeType(entry.format)
                                     putExtra(Intent.EXTRA_STREAM, uri)
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 },

@@ -70,6 +70,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.linky.voiceclone.R
 import com.linky.voiceclone.data.Voice
 import com.linky.voiceclone.ui.AppTopBar
+import com.linky.voiceclone.ui.components.AudioSaveButton
+import com.linky.voiceclone.ui.components.audioMimeType
 import com.linky.voiceclone.ui.components.GlassSurface
 import com.linky.voiceclone.ui.components.AppTextArea
 import com.linky.voiceclone.ui.components.StaticWaveform
@@ -482,6 +484,11 @@ private fun ResultCard(file: File, text: String) {
                     Text(if (playing) "停止播放" else "播放结果")
                 }
                 Spacer(Modifier.width(8.dp))
+                AudioSaveButton(
+                    file = file,
+                    format = file.extension,
+                    timestamp = file.lastModified(),
+                )
                 IconButton(onClick = {
                     val uri = FileProvider.getUriForFile(
                         context,
@@ -489,9 +496,9 @@ private fun ResultCard(file: File, text: String) {
                         file,
                     )
                     context.startActivity(
-                        Intent.createChooser(
+                            Intent.createChooser(
                             Intent(Intent.ACTION_SEND).apply {
-                                type = if (file.extension.equals("mp3", true)) "audio/mpeg" else "audio/wav"
+                                type = audioMimeType(file.extension)
                                 putExtra(Intent.EXTRA_STREAM, uri)
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             },

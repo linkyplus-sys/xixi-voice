@@ -9,7 +9,7 @@
 - 使用 `mimo-v2.5-tts-voiceclone` 复刻音色。
 - 使用 `mimo-v2.5-tts-voicedesign` 根据文字描述设计音色。
 - 可取消的分阶段生成状态与分类错误提示。
-- 单实例音频播放、试听、分享和删除。
+- 单实例音频播放、试听、保存到文件夹、分享和删除。
 - Room 持久化音色与生成历史。
 - 深色声场视觉系统和自适应液态玻璃底部导航。
 
@@ -75,6 +75,8 @@ app/src/main/java/com/linky/voiceclone/
 | 生成结果 | `filesDir/audio/output/` |
 | 音色与历史元数据 | Room `voiceclone.db` |
 | API 配置 | DataStore `settings.preferences_pb` |
+
+生成结果会先保存在应用私有目录；结果页和历史记录中的“保存到文件夹”按钮可通过 Android 系统文件选择器导出到用户指定位置，不依赖系统分享面板是否提供文件管理器入口。
 
 API Key 仅保存在当前设备，不应写入源码或提交到 Git。如果未来使用应用方统一密钥，应改为后端代理，不能打包到 APK。
 
