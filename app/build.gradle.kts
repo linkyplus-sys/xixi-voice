@@ -6,6 +6,17 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val releaseStoreFile = providers.environmentVariable("XIXI_RELEASE_STORE_FILE").orNull
+val releaseStorePassword = providers.environmentVariable("XIXI_RELEASE_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("XIXI_RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("XIXI_RELEASE_KEY_PASSWORD").orNull
+val releaseSigningConfigured = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.linky.voiceclone"
     compileSdk = 36
@@ -14,13 +25,27 @@ android {
         applicationId = "com.linky.voiceclone"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.1.1"
+    }
+
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = file(checkNotNull(releaseStoreFile))
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
