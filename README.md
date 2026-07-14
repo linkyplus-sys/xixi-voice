@@ -96,6 +96,19 @@ $env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
 .\gradlew.bat assembleDebug
 ```
 
+## 正式签名
+
+正式 APK 通过以下环境变量读取签名，不应把签名文件或密码提交到仓库：
+
+```text
+XIXI_RELEASE_STORE_FILE
+XIXI_RELEASE_STORE_PASSWORD
+XIXI_RELEASE_KEY_ALIAS
+XIXI_RELEASE_KEY_PASSWORD
+```
+
+配置完成后执行 `assembleRelease`，产物位于 `app/build/outputs/apk/release/`。长期发布必须始终使用同一份签名文件，否则用户无法覆盖升级。
+
 APK 输出：
 
 ```text
