@@ -13,33 +13,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val AppBackground = Color(0xFF080B12)
-val AppBackgroundRaised = Color(0xFF0D121D)
-val GlassBase = Color(0xCC111827)
-val GlassHighlight = Color(0x1FFFFFFF)
-val BrandBlue = Color(0xFF5B82FF)
-val BrandViolet = Color(0xFF8B5CF6)
-val TextPrimary = Color(0xFFF4F7FF)
-val TextSecondary = Color(0xFF94A3B8)
+val AppBackground = Color(0xFF0B0F15)
+val AppBackgroundRaised = Color(0xFF101722)
+val GlassBase = Color(0xF5151C26)
+val GlassHighlight = Color(0x14FFFFFF)
+val BrandBlue = Color(0xFF86A5F8)
+val BrandViolet = Color(0xFF9B9DBB)
+val TextPrimary = Color(0xFFF2F4F8)
+val TextSecondary = Color(0xFFB5BFCD)
 
 private val DarkColors = darkColorScheme(
     primary = BrandBlue,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFF1D3470),
-    onPrimaryContainer = Color(0xFFDCE6FF),
+    onPrimary = Color(0xFF0C1830),
+    primaryContainer = Color(0xFF263755),
+    onPrimaryContainer = Color(0xFFE4EBFF),
     secondary = BrandViolet,
-    onSecondary = Color.White,
+    onSecondary = Color(0xFF171824),
     background = AppBackground,
     onBackground = TextPrimary,
-    surface = Color(0xFF121824),
+    surface = Color(0xFF141B25),
     onSurface = TextPrimary,
-    surfaceVariant = Color(0xFF182131),
+    surfaceVariant = Color(0xFF1C2532),
     onSurfaceVariant = TextSecondary,
-    outline = Color.White.copy(alpha = 0.14f),
-    outlineVariant = Color.White.copy(alpha = 0.08f),
-    error = Color(0xFFFF6577),
-    errorContainer = Color(0xFF421E28),
-    onErrorContainer = Color(0xFFFFD9DF),
+    outline = Color(0xFF526176),
+    outlineVariant = Color(0xFF2D3847),
+    error = Color(0xFFFF8291),
+    errorContainer = Color(0xFF48242C),
+    onErrorContainer = Color(0xFFFFDCE0),
 )
 
 private val AppTypography = Typography(
@@ -73,8 +73,8 @@ private val AppTypography = Typography(
     ),
     bodySmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontSize = 12.sp,
-        lineHeight = 17.sp,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
     ),
     labelLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,

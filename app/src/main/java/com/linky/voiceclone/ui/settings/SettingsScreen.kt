@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -43,6 +45,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.linky.voiceclone.ui.AppTopBar
 import com.linky.voiceclone.ui.components.GlassSurface
+import com.linky.voiceclone.ui.components.appTextFieldColors
 import com.linky.voiceclone.viewmodel.ConfigTestState
 import com.linky.voiceclone.viewmodel.SettingsViewModel
 
@@ -72,7 +75,10 @@ fun SettingsScreen(
             },
         )
         LazyColumn(
-            modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+                .navigationBarsPadding(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -96,6 +102,8 @@ fun SettingsScreen(
                                     )
                                 }
                             },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = appTextFieldColors(),
                             modifier = Modifier.fillMaxWidth(),
                         )
                         OutlinedTextField(
@@ -103,6 +111,8 @@ fun SettingsScreen(
                             onValueChange = { baseUrl = it; viewModel.markEdited() },
                             label = { Text("Base URL") },
                             singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = appTextFieldColors(),
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Text(

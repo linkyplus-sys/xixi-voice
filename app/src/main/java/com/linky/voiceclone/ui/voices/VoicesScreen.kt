@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,7 +60,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,6 +71,7 @@ import com.linky.voiceclone.data.Voice
 import com.linky.voiceclone.ui.AppTopBar
 import com.linky.voiceclone.ui.components.GlassSurface
 import com.linky.voiceclone.ui.components.VoiceAvatar
+import com.linky.voiceclone.ui.components.appTextFieldColors
 import com.linky.voiceclone.util.PlayerManager
 import com.linky.voiceclone.util.WavRecorder
 import com.linky.voiceclone.viewmodel.VoiceImportState
@@ -189,7 +188,12 @@ fun VoicesScreen() {
         AppTopBar(title = "我的音色")
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 16.dp,
+                end = 16.dp,
+                bottom = 116.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
@@ -302,6 +306,8 @@ fun VoicesScreen() {
                         label = { Text("音色名称") },
                         placeholder = { Text("例如：我的声音") },
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = appTextFieldColors(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
@@ -309,6 +315,8 @@ fun VoicesScreen() {
                         onValueChange = { voiceDescription = it },
                         label = { Text("描述（可选）") },
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = appTextFieldColors(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
@@ -470,8 +478,24 @@ private fun VoiceCard(
             title = { Text("编辑音色") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(editName, { editName = it }, label = { Text("名称") }, singleLine = true)
-                    OutlinedTextField(editDescription, { editDescription = it }, label = { Text("描述") }, singleLine = true)
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("名称") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = appTextFieldColors(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = editDescription,
+                        onValueChange = { editDescription = it },
+                        label = { Text("描述") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = appTextFieldColors(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             },
             confirmButton = {

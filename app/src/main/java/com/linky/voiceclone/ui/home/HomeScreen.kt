@@ -10,9 +10,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,11 +43,10 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,9 +56,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +71,7 @@ import com.linky.voiceclone.R
 import com.linky.voiceclone.data.Voice
 import com.linky.voiceclone.ui.AppTopBar
 import com.linky.voiceclone.ui.components.GlassSurface
+import com.linky.voiceclone.ui.components.AppTextArea
 import com.linky.voiceclone.ui.components.StaticWaveform
 import com.linky.voiceclone.ui.components.VoiceAvatar
 import com.linky.voiceclone.ui.theme.BrandBlue
@@ -100,6 +104,7 @@ fun HomeScreen(
     val text by synthViewModel.text.collectAsStateWithLifecycle()
     val voiceDescription by synthViewModel.voiceDesc.collectAsStateWithLifecycle()
     var selectedVoiceId by remember { mutableStateOf<String?>(null) }
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
 
     LaunchedEffect(voices) {
         if (voices.none { it.id == selectedVoiceId }) {
@@ -112,7 +117,7 @@ fun HomeScreen(
             title = "嘻嘻配音",
             navigationIcon = {
                 Image(
-                    painter = painterResource(R.drawable.ic_launcher_foreground),
+                    painter = painterResource(R.mipmap.ic_launcher),
                     contentDescription = "嘻嘻配音",
                     modifier = Modifier.padding(start = 16.dp).size(30.dp).clip(CircleShape),
                 )
@@ -125,8 +130,17 @@ fun HomeScreen(
         )
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+                .padding(bottom = if (imeVisible) 16.dp else 0.dp),
+            userScrollEnabled = !imeVisible,
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 16.dp,
+                end = 16.dp,
+                bottom = 116.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
@@ -171,47 +185,42 @@ fun HomeScreen(
                 }
             } else {
                 item {
-                    GlassSurface(Modifier.fillMaxWidth()) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.AutoAwesome, null, tint = BrandViolet)
-                                Spacer(Modifier.width(8.dp))
-                                Text("设计你的音色", fontWeight = FontWeight.SemiBold)
-                            }
-                            OutlinedTextField(
-                                value = voiceDescription,
-                                onValueChange = { synthViewModel.voiceDesc.value = it },
-                                placeholder = { Text("例如：青年女性，声线清亮，语速自然，温柔但有力量") },
-                                minLines = 3,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = transparentTextFieldColors(),
-                            )
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.AutoAwesome, null, tint = BrandViolet)
+                            Spacer(Modifier.width(8.dp))
+                            Text("设计你的音色", fontWeight = FontWeight.SemiBold)
                         }
+                        AppTextArea(
+                            value = voiceDescription,
+                            onValueChange = { synthViewModel.voiceDesc.value = it },
+                            placeholder = "例如：青年女性，声线清亮，语速自然，温柔但有力量",
+                            minLines = 3,
+                            maxLines = 6,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
 
             item {
-                GlassSurface(Modifier.fillMaxWidth()) {
-                    Column {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("配音文本", fontWeight = FontWeight.SemiBold)
-                            Text(
-                                "${text.length} 字",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        OutlinedTextField(
-                            value = text,
-                            onValueChange = { synthViewModel.text.value = it },
-                            placeholder = { Text("输入想让它说的话…") },
-                            minLines = 5,
-                            maxLines = 10,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = transparentTextFieldColors(),
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("配音文本", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "${text.length} 字",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    AppTextArea(
+                        value = text,
+                        onValueChange = { synthViewModel.text.value = it },
+                        placeholder = "输入想让它说的话…",
+                        minLines = 5,
+                        maxLines = 10,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
 
@@ -221,22 +230,20 @@ fun HomeScreen(
                     enabled = state != SynthState.LOADING,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp)
-                        .background(
-                            Brush.horizontalGradient(listOf(BrandBlue, BrandViolet)),
-                            RoundedCornerShape(18.dp),
-                        ),
-                    shape = RoundedCornerShape(18.dp),
+                        .height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                         disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                 ) {
                     if (state == SynthState.LOADING) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimary,
                         )
                         Spacer(Modifier.width(8.dp))
                         Text("正在生成")
@@ -327,19 +334,26 @@ private fun ModeTab(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) BrandBlue.copy(alpha = 0.24f) else Color.Transparent)
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        icon()
-        Spacer(Modifier.width(7.dp))
-        Text(
-            title,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        val contentColor = if (selected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        CompositionLocalProvider(LocalContentColor provides contentColor) {
+            icon()
+            Spacer(Modifier.width(7.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                color = contentColor,
+            )
+        }
     }
 }
 
@@ -491,14 +505,6 @@ private fun ResultCard(file: File, text: String) {
         }
     }
 }
-
-@Composable
-private fun transparentTextFieldColors() = TextFieldDefaults.colors(
-    focusedContainerColor = Color.Transparent,
-    unfocusedContainerColor = Color.Transparent,
-    focusedIndicatorColor = Color.Transparent,
-    unfocusedIndicatorColor = Color.Transparent,
-)
 
 private fun stageLabel(stage: SynthStage): String = when (stage) {
     SynthStage.PREPARING -> "正在检查配置和音频"
